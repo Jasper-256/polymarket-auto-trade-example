@@ -6,7 +6,8 @@ from helpers.clob_client import create_clob_client
 def generate_api_keys():
     client = create_clob_client()
 
-    api_credentials = client.create_api_key()
+    api_credentials = client.derive_api_key()
+    # If this does not work, try client.create_api_key() or client.get_api_key() or client.create_api_key(nonce=1)
 
     env_path = '.env'  # Path to your .env file
     load_dotenv(env_path)  # Load existing .env file if present

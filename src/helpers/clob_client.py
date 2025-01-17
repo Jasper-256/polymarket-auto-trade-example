@@ -19,7 +19,8 @@ def create_clob_client() -> ClobClient:
             api_secret=os.getenv('CLOB_SECRET'),
             api_passphrase=os.getenv('CLOB_PASS_PHRASE'),
         )
+        funder = os.getenv('FUNDER')
     else:
         creds = None
 
-    return ClobClient(host=host, key=key, chain_id=chain_id, creds=creds)
+    return ClobClient(host=host, key=key, chain_id=chain_id, creds=creds, funder=funder, signature_type=1)
