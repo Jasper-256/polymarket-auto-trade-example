@@ -2,3 +2,6 @@ __pycache__
 venv
 .env
 .vscode
+.DS_Store
+orders.json
+positions.json
