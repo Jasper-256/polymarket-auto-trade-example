@@ -5,3 +5,4 @@ venv
 .DS_Store
 orders.json
 positions.json
+control.json

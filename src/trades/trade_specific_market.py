@@ -11,6 +11,8 @@ from py_clob_client.order_builder.constants import SELL
 import json
 import os
 import math
+import requests
+from dotenv import load_dotenv
 
 
 def create_and_submit_order(token_id: str, side: Literal['BUY'] | Literal['SELL'], price: float, size: int):
@@ -55,24 +57,42 @@ def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
     else:
         print(f"Failed to create order: {order_response.get('errorMsg', 'Unknown error')}")
 
-def conditional_order(market, outcome, current_total, bands, band_num, midpoint_yes, midpoint_no):
+def conditional_order(market, outcome, current_total_in_band, bands, band_num, midpoint_yes, midpoint_no, available_to_buy, available_yes_to_sell, available_no_to_sell):
     if outcome == 'yes':
-        price = midpoint_yes - bands[str(band_num)]['avg_margin']
+        buy_price = midpoint_yes - bands[str(band_num)]['avg_margin']
+        available_to_sell = available_no_to_sell
+        sell_outcome = 'no'
     elif outcome == 'no':
-        price = midpoint_no - bands[str(band_num)]['avg_margin']
+        buy_price = midpoint_no - bands[str(band_num)]['avg_margin']
+        available_to_sell = available_yes_to_sell
+        sell_outcome = 'yes'
     else:
         return
-    price = round(price, 3)
     
-    size = bands[str(band_num)]['avg_amount'] - current_total
+    buy_price = round(buy_price, 2)
+    sell_price = round(1 - buy_price, 2)
+    
+    size = bands[str(band_num)]['avg_amount'] - current_total_in_band
     if size < 5:
         size = 5
-    if size * price < 1:
-        size = math.ceil(1 / price)
+    
+    if available_to_sell >= size:
+        limit_order(market=market, side='sell', outcome=sell_outcome, price=sell_price, size=size)
+        return
+    elif size >= 10 and (size - available_to_sell) >= 5 and available_to_sell >= 5 and ((size - available_to_sell) * buy_price) >= 1 and available_to_buy >= ((size - available_to_sell) * buy_price):
+        limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=(size - available_to_sell))
+        limit_order(market=market, side='sell', outcome=sell_outcome, price=sell_price, size=available_to_sell)
+        return
 
-    limit_order(market=market, side='buy', outcome=outcome, price=price, size=size)
+    if size * buy_price < 1:
+        size = math.ceil(1 / buy_price)
+    
+    if available_to_buy >= size * buy_price:
+        limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=size)
+    else:
+        print(f'[ERROR]\tnot enough balance, available_to_buy={available_to_buy}, size*buy_price={size * buy_price}')
 
-def get_orders(file_path: str = 'orders.json'):
+def get_json(file_path: str):
     if os.path.exists(file_path):
         with open(file_path, 'r') as file:
             try:
@@ -83,33 +103,82 @@ def get_orders(file_path: str = 'orders.json'):
         data = []
     return data
 
-def get_positions(file_path: str = 'positions.json'):
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            try:
-                data = json.load(file)
-            except json.JSONDecodeError:
-                data = []
-    else:
-        data = []
-    return data
+def calculate_total_open_buy_value(market_id, file_path='orders.json'):
+    """
+    Calculate the total value of buy orders (price * size) for a specific market.
 
-def get_bands(file_path: str = 'bands.json'):
-    if os.path.exists(file_path):
+    Args:
+        market_id (str): The ID of the market to filter orders for.
+        file_path (str): The path to the orders.json file.
+
+    Returns:
+        float: The total value of buy orders for the given market.
+    """
+    if not os.path.exists(file_path):
+        print("Orders file does not exist.")
+        return 0.0
+
+    try:
         with open(file_path, 'r') as file:
-            try:
-                data = json.load(file)
-            except json.JSONDecodeError:
-                data = []
-    else:
-        data = []
-    return data
+            orders = json.load(file)
+    except json.JSONDecodeError:
+        print("Failed to read orders.json or it is empty.")
+        return 0.0
+
+    total_value = 0.0
+
+    for order in orders:
+        if order.get('market_id') == market_id and order.get('side') == 'buy':
+            price = order.get('price', 0.0)
+            size = order.get('size', 0)
+            size_matched = order.get('size_matched', 0)
+            total_value += price * (size - size_matched)
+
+    return round(total_value, 4)
+
+def calculate_total_open_sell_size(market_id, file_path='orders.json'):
+    """
+    Calculate the total size for 'yes' and 'no' sell orders for a specific market.
+
+    Args:
+        market_id (str): The ID of the market to filter orders for.
+        file_path (str): The path to the orders.json file.
+
+    Returns:
+        tuple: A tuple containing the total size for 'yes' and 'no' sell orders (yes_sell_total, no_sell_total).
+    """
+    if not os.path.exists(file_path):
+        print("Orders file does not exist.")
+        return 0, 0
+
+    try:
+        with open(file_path, 'r') as file:
+            orders = json.load(file)
+    except json.JSONDecodeError:
+        print("Failed to read orders.json or it is empty.")
+        return 0, 0
+
+    yes_sell_total = 0.0
+    no_sell_total = 0.0
+
+    for order in orders:
+        if order.get('market_id') == market_id and order.get('side') == 'sell':
+            outcome = order.get('outcome')
+            size = order.get('size', 0)
+            size_matched = order.get('size_matched', 0)
+
+            if outcome == 'yes':
+                yes_sell_total += size - size_matched
+            elif outcome == 'no':
+                no_sell_total += size - size_matched
+
+    return round(yes_sell_total, 4), round(no_sell_total, 4)
 
 def get_orders_in_band(band_num, midpoint_yes, midpoint_no, file_path='orders.json'):
     """
     Retrieve orders from orders.json that fall within a specific band range for yes and no outcomes.
     """
-    bands = get_bands()
+    bands = get_json('bands.json')
     min_margin = bands[str(band_num)]['min_margin']
     max_margin = bands[str(band_num)]['max_margin']
 
@@ -369,3 +438,32 @@ def get_midpoint_no(order_book):
         return None
 
     return math.floor(round((best_bid_no + best_ask_no) / 2, 4) * 100) / 100
+
+def get_account_balance():
+    load_dotenv()
+    polyscan_api_key = os.getenv('POLYSCAN_API_KEY')
+    funder = os.getenv('FUNDER')
+    USDC_e = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+
+    url = (
+        "https://api.polygonscan.com/api"
+        "?module=account"
+        "&action=tokenbalance"
+        f"&contractaddress={USDC_e}"
+        f"&address={funder}"
+        "&tag=latest"
+        f"&apikey={polyscan_api_key}"
+    )
+
+
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        data = response.json()
+        if data["status"] == "1" and "result" in data:
+            return int(data["result"]) / 1000000
+        else:
+            raise ValueError(f"Error in response: {data.get('message', 'Unknown error')}")
+    else:
+        response.raise_for_status()
