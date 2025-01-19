@@ -59,7 +59,7 @@ def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
     else:
         print(f"Failed to create order: {order_response.get('errorMsg', 'Unknown error')}")
 
-def conditional_order(market, outcome, current_total_in_band, bands, band_num, midpoint_yes, midpoint_no, available_to_buy, available_yes_to_sell, available_no_to_sell):
+def conditional_order(market, outcome, current_total_in_band, bands, band_num, midpoint_yes, midpoint_no, available_to_buy, available_yes_to_sell, available_no_to_sell, max_position, owned_outcome, owned_yes):
     if outcome == 'yes':
         buy_price = midpoint_yes - bands[str(band_num)]['avg_margin']
         available_to_sell = available_no_to_sell
@@ -78,11 +78,13 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     if size < 5:
         size = 5
     
+    shares_to_buy = size - available_to_sell
+
     if available_to_sell >= size:
         limit_order(market=market, side='sell', outcome=sell_outcome, price=sell_price, size=size)
         return
-    elif size >= 10 and (size - available_to_sell) >= 5 and available_to_sell >= 5 and ((size - available_to_sell) * buy_price) >= 1 and available_to_buy >= ((size - available_to_sell) * buy_price):
-        limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=(size - available_to_sell))
+    elif size >= 10 and shares_to_buy >= 5 and available_to_sell >= 5 and (shares_to_buy * buy_price) >= 1 and available_to_buy >= (shares_to_buy * buy_price):
+        limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=shares_to_buy)
         limit_order(market=market, side='sell', outcome=sell_outcome, price=sell_price, size=available_to_sell)
         return
 
@@ -90,12 +92,20 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
         size = math.ceil(1 / buy_price)
     
     if available_to_buy >= size * buy_price:
+        # Stop if we are overbuying one outcome
+        if outcome == owned_outcome and (abs(owned_yes) + size) > max_position:
+            size = max_position - owned_yes
+            if size < 5 or size * buy_price < 1:
+                return
         limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=size)
     else:
         print(f'[ERROR]\tnot enough balance, available_to_buy={available_to_buy}, size*buy_price={size * buy_price}')
 
 def round_down_to_cents(number):
     return math.floor(number * 100) / 100
+
+def round_up_to_cents(number):
+    return math.ceil(number * 100) / 100
 
 def get_json(file_path: str):
     if os.path.exists(file_path):

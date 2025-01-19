@@ -77,6 +77,7 @@ def auto_make_markets(market_ids):
             available_yes_to_sell = yes_position - open_sell_size_yes
             available_no_to_sell = no_position - open_sell_size_no
 
+            max_position = bands['max_position']
             owned_outcome = 'none'
             owned_yes = yes_position - no_position
             owned_outcome_value = 0
@@ -121,7 +122,7 @@ def auto_make_markets(market_ids):
                     available_yes_to_sell = yes_position - open_sell_size_yes
                     available_no_to_sell = no_position - open_sell_size_no
 
-                    conditional_order(market=market, outcome='yes', current_total_in_band=yes_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell)
+                    conditional_order(market=market, outcome='yes', current_total_in_band=yes_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes)
 
                 if no_total < bands[str(band_num)]['min_amount']:
                     open_buy_value = calculate_total_open_buy_value(market_id)
@@ -131,7 +132,7 @@ def auto_make_markets(market_ids):
                     available_yes_to_sell = yes_position - open_sell_size_yes
                     available_no_to_sell = no_position - open_sell_size_no
 
-                    conditional_order(market=market, outcome='no', current_total_in_band=no_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell)
+                    conditional_order(market=market, outcome='no', current_total_in_band=no_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes)
                 
                 print(f'[BAND {band_num}]\tyes_total={yes_total}, no_total={no_total}')
             print()

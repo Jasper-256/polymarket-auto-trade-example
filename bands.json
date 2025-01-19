@@ -13,5 +13,6 @@
         "min_amount": 10,
         "avg_amount": 20
     },
-    "num_bands": 2
+    "num_bands": 2,
+    "max_position": 30
 }
