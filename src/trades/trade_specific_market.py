@@ -44,9 +44,10 @@ def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
     else:
         print('Invalid outcome.')
         return
-    
-    print(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}')
-    log_message(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}')
+    market_id = market['condition_id']
+
+    print(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}, market_id={market_id}')
+    log_message(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}, market_id={market_id}')
 
     # Create and submit the order
     order_response = create_and_submit_order(token_id=token_id, side=side_literal, price=price, size=size)
@@ -70,10 +71,8 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     else:
         return
     
-    print(f'[DEBUG 0]\tbuy_price={buy_price}, sell_price={1 - buy_price}')
     buy_price = round_down_to_cents(buy_price)
     sell_price = round(1 - buy_price, 2)
-    print(f'[DEBUG 1]\tbuy_price={buy_price}, sell_price={sell_price}')
     
     size = bands[str(band_num)]['avg_amount'] - current_total_in_band
     if size < 5:
@@ -310,7 +309,7 @@ def update_position(market_id, side, outcome, size_delta, file_path: str = 'posi
 
     # Ensure the market_id exists in the positions
     if market_id not in positions:
-        positions[market_id] = {'yes': 0, 'no': 0}
+        positions[market_id] = {'yes': 0.0, 'no': 0.0}
 
     # Update the appropriate position
     if side == 'buy':
@@ -322,8 +321,8 @@ def update_position(market_id, side, outcome, size_delta, file_path: str = 'posi
     with open(file_path, 'w') as file:
         json.dump(positions, file, indent=4)
 
-    print(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}')
-    log_message(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}')
+    print(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}, market_id={market_id}')
+    log_message(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}, market_id={market_id}')
 
 def get_order_info(order_id):
     client = create_clob_client()
@@ -351,6 +350,10 @@ def update_order_info(order_id, file_path: str = 'orders.json'):
             
             order = get_order_info(order_id)
             print(f'[UPDATE ORDER]\torder_id={order_id}')
+
+            if order['status'] == 'CANCELED':
+                remove_orders_from_file([order['id']])
+                return
             
             new_size_matched = float(order.get('size_matched', 0))
             price = float(order.get('price', 0))
@@ -363,15 +366,9 @@ def update_order_info(order_id, file_path: str = 'orders.json'):
                 size_delta = new_size_matched - old_size_matched
                 update_position(record['market_id'], record['side'], record['outcome'], size_delta)
 
-    if order['status'] == 'CANCELED':
-        remove_orders_from_file([order['id']])
-        return
-
     # Write the updated data back to the file
     with open(file_path, 'w') as file:
         json.dump(data, file, indent=4)
-
-    # print(f"Order updated: {order_id} with size_matched: {order.get('size_matched', 0)}")
 
 def update_all_order_info(market_id, file_path: str = 'orders.json'):
     """Update the size_matched value for all orders in the JSON file."""
@@ -388,7 +385,7 @@ def update_all_order_info(market_id, file_path: str = 'orders.json'):
 
     for order in data:
         if order['market_id'] == market_id:
-            update_order_info(order['order_id'], file_path)
+            update_order_info(order['order_id'])
 
 def cancel_orders(order_ids):
     client = create_clob_client()

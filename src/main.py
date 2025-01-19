@@ -19,7 +19,6 @@ from trades.trade_specific_market import get_spread
 from trades.trade_specific_market import get_midpoint_yes
 from trades.trade_specific_market import get_midpoint_no
 from trades.trade_specific_market import update_all_order_info
-from trades.trade_specific_market import remove_orders_from_file
 from trades.trade_specific_market import get_json
 from trades.trade_specific_market import get_orders_in_band
 from trades.trade_specific_market import calculate_totals_in_band
