@@ -45,10 +45,11 @@ def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
         print('Invalid outcome.')
         return
     
+    print(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}')
+    log_message(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}')
+
     # Create and submit the order
     order_response = create_and_submit_order(token_id=token_id, side=side_literal, price=price, size=size)
-
-    print(f'[ORDER PLACED]\tside={side}, outcome={outcome}, price={price}, size={size}')
 
     # If the order was successfully created, record it to the JSON file
     if order_response.get('success') and 'orderID' in order_response:
@@ -69,8 +70,10 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     else:
         return
     
-    buy_price = round(buy_price, 2)
+    print(f'[DEBUG 0]\tbuy_price={buy_price}, sell_price={1 - buy_price}')
+    buy_price = round_down_to_cents(buy_price)
     sell_price = round(1 - buy_price, 2)
+    print(f'[DEBUG 1]\tbuy_price={buy_price}, sell_price={sell_price}')
     
     size = bands[str(band_num)]['avg_amount'] - current_total_in_band
     if size < 5:
@@ -91,6 +94,9 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
         limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=size)
     else:
         print(f'[ERROR]\tnot enough balance, available_to_buy={available_to_buy}, size*buy_price={size * buy_price}')
+
+def round_down_to_cents(number):
+    return math.floor(number * 100) / 100
 
 def get_json(file_path: str):
     if os.path.exists(file_path):
@@ -174,10 +180,12 @@ def calculate_total_open_sell_size(market_id, file_path='orders.json'):
 
     return round(yes_sell_total, 4), round(no_sell_total, 4)
 
-def get_orders_in_band(band_num, midpoint_yes, midpoint_no, file_path='orders.json'):
+def get_orders_in_band(band_num, midpoint_yes, midpoint_no, market_id, file_path='orders.json'):
     """
     Retrieve orders from orders.json that fall within a specific band range for yes and no outcomes.
     """
+    rnd_amt = 4
+
     bands = get_json('bands.json')
     min_margin = bands[str(band_num)]['min_margin']
     max_margin = bands[str(band_num)]['max_margin']
@@ -196,18 +204,19 @@ def get_orders_in_band(band_num, midpoint_yes, midpoint_no, file_path='orders.js
     filtered_orders = []
 
     for order in orders:
-        price = order.get('price')
-        outcome = order.get('outcome')
+        if order['market_id'] == market_id:
+            price = order.get('price')
+            outcome = order.get('outcome')
 
-        if outcome == 'yes':
-            if (midpoint_yes - max_margin) < price <= (midpoint_yes - min_margin) or \
-               (midpoint_yes + min_margin) <= price < (midpoint_yes + max_margin):
-                filtered_orders.append(order)
+            if outcome == 'yes':
+                if round((midpoint_yes - max_margin), rnd_amt) < round(price, rnd_amt) <= round((midpoint_yes - min_margin), rnd_amt) or \
+                round((midpoint_yes + min_margin), rnd_amt) <= round(price, rnd_amt) < round((midpoint_yes + max_margin), rnd_amt):
+                    filtered_orders.append(order)
 
-        elif outcome == 'no':
-            if (midpoint_no - max_margin) < price <= (midpoint_no - min_margin) or \
-               (midpoint_no + min_margin) <= price < (midpoint_no + max_margin):
-                filtered_orders.append(order)
+            elif outcome == 'no':
+                if round((midpoint_no - max_margin), rnd_amt) < round(price, rnd_amt) <= round((midpoint_no - min_margin), rnd_amt) or \
+                round((midpoint_no + min_margin), rnd_amt) <= round(price, rnd_amt) < round((midpoint_no + max_margin), rnd_amt):
+                    filtered_orders.append(order)
 
     return filtered_orders
 
@@ -285,6 +294,8 @@ def remove_orders_from_file(order_ids, file_path: str = 'orders.json'):
     # Write the updated data back to the file
     with open(file_path, 'w') as file:
         json.dump(data, file, indent=4)
+    
+    log_message(f'[REMOVED]\torder_ids={order_ids}')
 
 def update_position(market_id, side, outcome, size_delta, file_path: str = 'positions.json'):
     positions = {}
@@ -312,6 +323,7 @@ def update_position(market_id, side, outcome, size_delta, file_path: str = 'posi
         json.dump(positions, file, indent=4)
 
     print(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}')
+    log_message(f'[ORDER FILLED]\tside={side}, outcome={outcome}, filled={size_delta}')
 
 def get_order_info(order_id):
     client = create_clob_client()
@@ -361,7 +373,7 @@ def update_order_info(order_id, file_path: str = 'orders.json'):
 
     # print(f"Order updated: {order_id} with size_matched: {order.get('size_matched', 0)}")
 
-def update_all_order_info(file_path: str = 'orders.json'):
+def update_all_order_info(market_id, file_path: str = 'orders.json'):
     """Update the size_matched value for all orders in the JSON file."""
     if os.path.exists(file_path):
         with open(file_path, 'r') as file:
@@ -375,7 +387,8 @@ def update_all_order_info(file_path: str = 'orders.json'):
         return
 
     for order in data:
-        update_order_info(order['order_id'], file_path)
+        if order['market_id'] == market_id:
+            update_order_info(order['order_id'], file_path)
 
 def cancel_orders(order_ids):
     client = create_clob_client()
@@ -385,6 +398,7 @@ def cancel_orders(order_ids):
 
     remove_orders_from_file(order_ids)
     print(f'[CANCELED]\torder_ids={successfully_canceled_orders}')
+    log_message(f'[CANCELED]\torder_ids={successfully_canceled_orders}')
 
 def get_order_book(market):
     client = create_clob_client()
@@ -428,7 +442,7 @@ def get_midpoint_yes(order_book):
     if not best_bid_yes or not best_ask_yes:
         return None
 
-    return math.floor(round((best_bid_yes + best_ask_yes) / 2, 4) * 100) / 100
+    return round((best_bid_yes + best_ask_yes) / 2, 4)
 
 def get_midpoint_no(order_book):
     best_bid_no = get_best_bid_no(order_book)
@@ -437,7 +451,7 @@ def get_midpoint_no(order_book):
     if not best_bid_no or not best_ask_no:
         return None
 
-    return math.floor(round((best_bid_no + best_ask_no) / 2, 4) * 100) / 100
+    return round((best_bid_no + best_ask_no) / 2, 4)
 
 def get_account_balance():
     load_dotenv()
@@ -467,3 +481,38 @@ def get_account_balance():
             raise ValueError(f"Error in response: {data.get('message', 'Unknown error')}")
     else:
         response.raise_for_status()
+
+def set_stop(new_stop_value):
+    # Define the path to the JSON file
+    json_file_path = "control.json"
+
+    try:
+        # Open the file and load the JSON data
+        with open(json_file_path, "r") as file:
+            data = json.load(file)
+
+        # Update the "stop" key with the new value
+        data["stop"] = str(new_stop_value).lower()  # Ensure it's a string ("true" or "false")
+
+        # Write the updated JSON data back to the file
+        with open(json_file_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+    except FileNotFoundError:
+        print(f"Error: The file {json_file_path} does not exist.")
+    except json.JSONDecodeError:
+        print(f"Error: The file {json_file_path} contains invalid JSON.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+def log_message(message):
+    # Define the path to the log file
+    log_file_path = "log.txt"
+
+    try:
+        # Open the file in append mode and write the message with a newline
+        with open(log_file_path, "a") as file:
+            file.write(message + "\n")
+
+    except Exception as e:
+        print(f"An unexpected error occurred while logging the message: {e}")

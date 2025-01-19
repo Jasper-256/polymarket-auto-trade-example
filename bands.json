@@ -4,16 +4,14 @@
         "avg_margin": 0.01,
         "max_margin": 0.02,
         "min_amount": 10,
-        "avg_amount": 20,
-        "max_amount": 30
+        "avg_amount": 20
     },
     "1": {
         "min_margin": 0.02,
         "avg_margin": 0.02,
         "max_margin": 0.03,
         "min_amount": 10,
-        "avg_amount": 20,
-        "max_amount": 30
+        "avg_amount": 20
     },
     "num_bands": 2
 }
