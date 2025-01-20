@@ -58,6 +58,7 @@ def update_all_markets(market_ids, markets):
         best_ask_no = get_best_ask_no(order_book)
         midpoint_no = get_midpoint_no(order_book)
         spread = get_spread(order_book)
+        minimum_tick_size = market['minimum_tick_size']
 
         orders = get_json('orders.json')
         positions = get_json('positions.json')
@@ -121,7 +122,7 @@ def update_all_markets(market_ids, markets):
                 available_yes_to_sell = yes_position - open_sell_size_yes
                 available_no_to_sell = no_position - open_sell_size_no
 
-                conditional_order(market=market, outcome='yes', current_total_in_band=yes_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes)
+                conditional_order(market=market, outcome='yes', current_total_in_band=yes_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes, minimum_tick_size=minimum_tick_size)
 
             if no_total < bands[str(band_num)]['min_amount']:
                 open_buy_value = calculate_total_open_buy_value(market_id)
@@ -131,7 +132,7 @@ def update_all_markets(market_ids, markets):
                 available_yes_to_sell = yes_position - open_sell_size_yes
                 available_no_to_sell = no_position - open_sell_size_no
 
-                conditional_order(market=market, outcome='no', current_total_in_band=no_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes)
+                conditional_order(market=market, outcome='no', current_total_in_band=no_total, bands=bands, band_num=band_num, midpoint_yes=midpoint_yes, midpoint_no=midpoint_no, available_to_buy=available_to_buy, available_yes_to_sell=available_yes_to_sell, available_no_to_sell=available_no_to_sell, max_position=max_position, owned_outcome=owned_outcome, owned_yes=owned_yes, minimum_tick_size=minimum_tick_size)
             
             print(f'[BAND {band_num}]\tyes_total={yes_total}, no_total={no_total}')
         print()

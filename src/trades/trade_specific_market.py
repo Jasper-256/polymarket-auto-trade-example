@@ -59,7 +59,7 @@ def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
     else:
         print(f"Failed to create order: {order_response.get('errorMsg', 'Unknown error')}")
 
-def conditional_order(market, outcome, current_total_in_band, bands, band_num, midpoint_yes, midpoint_no, available_to_buy, available_yes_to_sell, available_no_to_sell, max_position, owned_outcome, owned_yes):
+def conditional_order(market, outcome, current_total_in_band, bands, band_num, midpoint_yes, midpoint_no, available_to_buy, available_yes_to_sell, available_no_to_sell, max_position, owned_outcome, owned_yes, minimum_tick_size):
     if outcome == 'yes':
         buy_price = midpoint_yes - bands[str(band_num)]['avg_margin']
         available_to_sell = available_no_to_sell
@@ -71,8 +71,12 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     else:
         return
     
-    buy_price = round_up_to_cents(buy_price)
-    sell_price = round(1 - buy_price, 2)
+    if minimum_tick_size == 0.01:
+        buy_price = round_up_to_cents(buy_price)
+    else:
+        buy_price = round_up_to_hundredths(buy_price)
+    
+    sell_price = round(1 - buy_price, 3)
     
     size = bands[str(band_num)]['avg_amount'] - current_total_in_band
     if size < 5:
@@ -106,6 +110,12 @@ def round_down_to_cents(number):
 
 def round_up_to_cents(number):
     return math.ceil(number * 100) / 100
+
+def round_down_to_hundredths(number):
+    return math.floor(number * 1000) / 1000
+
+def round_up_to_hundredths(number):
+    return math.ceil(number * 1000) / 1000
 
 def get_json(file_path: str):
     if os.path.exists(file_path):
