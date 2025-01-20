@@ -71,7 +71,7 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     else:
         return
     
-    buy_price = round_down_to_cents(buy_price)
+    buy_price = round_up_to_cents(buy_price)
     sell_price = round(1 - buy_price, 2)
     
     size = bands[str(band_num)]['avg_amount'] - current_total_in_band
