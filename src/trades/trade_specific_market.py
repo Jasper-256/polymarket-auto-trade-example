@@ -537,3 +537,19 @@ def log_message(message):
 
     except Exception as e:
         print(f"An unexpected error occurred while logging the message: {e}")
+
+def overwrite_markets_to_trade(new_markets):
+    file_path = 'control.json'
+    try:
+        # Load the current JSON data
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+
+        # Update the markets_to_trade field
+        data['markets_to_trade'] = new_markets
+
+        # Save the updated JSON back to the file
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error: {e}")

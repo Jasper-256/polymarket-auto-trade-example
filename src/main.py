@@ -25,6 +25,8 @@ from trades.trade_specific_market import calculate_totals_in_band
 from trades.trade_specific_market import calculate_total_open_buy_value
 from trades.trade_specific_market import calculate_total_open_sell_size
 from trades.trade_specific_market import set_stop
+from trades.trade_specific_market import overwrite_markets_to_trade
+from events.get_top_events import get_top_events
 
 
 load_dotenv()
@@ -139,6 +141,12 @@ def auto_make_markets(market_ids):
             market_id = market_ids[i]
             update_market(market_id=market_id, i=i)
 
+def run_all():
+    top_ids = get_top_events(5)
+    overwrite_markets_to_trade(top_ids)
+
 control = get_json('control.json')
 markets_to_trade = control['markets_to_trade']
 auto_make_markets(markets_to_trade)
+
+# run_all()

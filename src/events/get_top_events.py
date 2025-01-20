@@ -1,13 +1,13 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-import fetch_data
+import events.fetch_data as fetch_data
 
 poly_events = fetch_data.poly_fetch_all()
 os.makedirs('data', exist_ok=True)
 fetch_data.save_data_to_csv('data/poly_events.csv', poly_events)
 
-def process_events():
+def get_top_events(num_of_events):
     input_file = "data/poly_events.csv"
     output_file = "data/selected_events.csv"
 
@@ -37,10 +37,10 @@ def process_events():
     sorted_df.to_csv(output_file, sep='|', index=False)
 
     # Get the top condition_id values
-    top_condition_ids = sorted_df['condition_id'].head(3).tolist()
+    top_condition_ids = sorted_df['condition_id'].head(num_of_events).tolist()
 
     return top_condition_ids
 
 # Process the events and get the top condition IDs
-top_ids = process_events()
-print("Top condition IDs:", top_ids)
+# top_ids = get_top_events(5)
+# print("Top condition IDs:", top_ids)
