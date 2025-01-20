@@ -15,7 +15,7 @@ import requests
 from dotenv import load_dotenv
 
 
-def create_and_submit_order(token_id: str, side: Literal['BUY'] | Literal['SELL'], price: float, size: int):
+def create_and_submit_order(token_id: str, side: Literal['BUY'] | Literal['SELL'], price: float, size: float):
     client = create_clob_client()
 
     # Create and sign a limit order buying 100 YES tokens for 0.0005 each
@@ -28,7 +28,7 @@ def create_and_submit_order(token_id: str, side: Literal['BUY'] | Literal['SELL'
     signed_order = client.create_order(order_args)
     return client.post_order(signed_order)
 
-def limit_order(market: dict, side: str, outcome: str, price: float, size: int):
+def limit_order(market: dict, side: str, outcome: str, price: float, size: float):
     if side == 'buy':
         side_literal = BUY
     elif side == 'sell':
@@ -366,7 +366,8 @@ def update_order_info(order_id, file_path: str = 'orders.json'):
 
             total_size = record['size']
             if old_size_matched == total_size:
-                return # Don't fetch order info if it's been fully filled to save time
+                remove_orders_from_file(order_id)
+                return
             
             order = get_order_info(order_id)
             print(f'[UPDATE ORDER]\torder_id={order_id}')
@@ -420,6 +421,16 @@ def cancel_orders(order_ids):
     remove_orders_from_file(order_ids)
     print(f'[CANCELED]\torder_ids={successfully_canceled_orders}')
     log_message(f'[CANCELED]\torder_ids={successfully_canceled_orders}')
+
+def cancel_all_orders():
+    client = create_clob_client()
+
+    resp = client.cancel_all()
+    successfully_canceled_orders = resp['canceled']
+
+    remove_orders_from_file(successfully_canceled_orders)
+    print(f'[CANCELED ALL]\torder_ids={successfully_canceled_orders}')
+    log_message(f'[CANCELED ALL]\torder_ids={successfully_canceled_orders}')
 
 def get_order_book(market):
     client = create_clob_client()

@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import time
 
 from helpers.generate_wallet import generate_new_wallet
 from helpers.set_allowances import set_allowances
@@ -10,6 +11,7 @@ from trades.trade_specific_market import limit_order
 from trades.trade_specific_market import conditional_order
 from trades.trade_specific_market import update_order_info
 from trades.trade_specific_market import cancel_orders
+from trades.trade_specific_market import cancel_all_orders
 from trades.trade_specific_market import get_order_book
 from trades.trade_specific_market import get_best_bid_yes
 from trades.trade_specific_market import get_best_ask_yes
@@ -26,6 +28,8 @@ from trades.trade_specific_market import calculate_total_open_buy_value
 from trades.trade_specific_market import calculate_total_open_sell_size
 from trades.trade_specific_market import set_stop
 from trades.trade_specific_market import overwrite_markets_to_trade
+from trades.trade_specific_market import round_down_to_cents
+from trades.trade_specific_market import round_down_to_hundredths
 from events.get_top_events import get_top_events
 
 
@@ -141,12 +145,89 @@ def auto_make_markets(market_ids):
             market_id = market_ids[i]
             update_market(market_id=market_id, i=i)
 
+def start_sell_off():
+    cancel_all_orders()
+
+    pos = get_json('positions.json')
+
+    for item in pos.items():
+        market_id = item[0]
+
+        update_all_order_info(market_id)
+
+        positions = get_json('positions.json')
+        yes_amt = round_down_to_cents(positions[market_id]['yes'])
+        no_amt = round_down_to_cents(positions[market_id]['no'])
+
+        market = get_market(market_id)
+        order_book = get_order_book(market)
+
+        best_bid_yes = get_best_bid_yes(order_book)
+        best_ask_yes = get_best_ask_yes(order_book)
+        midpoint_yes = get_midpoint_yes(order_book)
+        best_bid_no = get_best_bid_no(order_book)
+        best_ask_no = get_best_ask_no(order_book)
+        midpoint_no = get_midpoint_no(order_book)
+        minimum_tick_size = market['minimum_tick_size']
+
+        if minimum_tick_size == 0.001:
+            midpoint_yes = round_down_to_hundredths(midpoint_yes)
+            midpoint_no = round_down_to_hundredths(midpoint_no)
+            if midpoint_yes == round(1 - midpoint_no, 3):
+                midpoint_yes = round(midpoint_yes + 0.001, 3)
+                midpoint_no = round(midpoint_no + 0.001, 3)
+        else:
+            midpoint_yes = round_down_to_cents(midpoint_yes)
+            midpoint_no = round_down_to_cents(midpoint_no)
+            if midpoint_yes == round(1 - midpoint_no, 2):
+                midpoint_yes = round(midpoint_yes + 0.01, 2)
+                midpoint_no = round(midpoint_no + 0.01, 2)
+
+        if yes_amt >= 5:
+            limit_order(market=market, side='sell', outcome='yes', price=midpoint_yes, size=yes_amt)
+        if no_amt >= 5:
+            limit_order(market=market, side='sell', outcome='no', price=midpoint_no, size=no_amt)
+
+def dump_everything():
+    for _ in range(10):
+        time.sleep(0.5)
+
+        cancel_all_orders()
+
+        pos = get_json('positions.json')
+
+        for item in pos.items():
+            market_id = item[0]
+
+            update_all_order_info(market_id)
+
+            positions = get_json('positions.json')
+            yes_amt = round_down_to_cents(positions[market_id]['yes'])
+            no_amt = round_down_to_cents(positions[market_id]['no'])
+
+            market = get_market(market_id)
+            order_book = get_order_book(market)
+
+            best_bid_yes = get_best_bid_yes(order_book)
+            best_ask_yes = get_best_ask_yes(order_book)
+            midpoint_yes = get_midpoint_yes(order_book)
+            best_bid_no = get_best_bid_no(order_book)
+            best_ask_no = get_best_ask_no(order_book)
+            midpoint_no = get_midpoint_no(order_book)
+
+            if yes_amt >= 5:
+                limit_order(market=market, side='sell', outcome='yes', price=best_bid_yes, size=yes_amt)
+            if no_amt >= 5:
+                limit_order(market=market, side='sell', outcome='no', price=best_bid_no, size=no_amt)
+
 def run_all():
+    account_balance = get_account_balance()
+
     top_ids = get_top_events(5)
     overwrite_markets_to_trade(top_ids)
 
-control = get_json('control.json')
-markets_to_trade = control['markets_to_trade']
-auto_make_markets(markets_to_trade)
+# control = get_json('control.json')
+# markets_to_trade = control['markets_to_trade']
+# auto_make_markets(markets_to_trade)
 
-# run_all()
+dump_everything()
