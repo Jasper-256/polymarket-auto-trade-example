@@ -361,6 +361,10 @@ def update_order_info(order_id, file_path: str = 'orders.json'):
             order = get_order_info(order_id)
             print(f'[UPDATE ORDER]\torder_id={order_id}')
 
+            if order == None:
+                remove_orders_from_file(order_id)
+                return
+
             if order['status'] == 'CANCELED':
                 remove_orders_from_file([order['id']])
                 return
