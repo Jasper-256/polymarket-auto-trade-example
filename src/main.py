@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 import time
+import math
+from datetime import datetime, timezone
 
 from helpers.generate_wallet import generate_new_wallet
 from helpers.set_allowances import set_allowances
@@ -30,6 +32,7 @@ from trades.trade_specific_market import set_stop
 from trades.trade_specific_market import overwrite_markets_to_trade
 from trades.trade_specific_market import round_down_to_cents
 from trades.trade_specific_market import round_down_to_hundredths
+from trades.trade_specific_market import log_message
 from events.get_top_events import get_top_events
 
 
@@ -130,7 +133,7 @@ def update_market(market_id, i):
         print(f'[BAND {band_num}]\tyes_total={yes_total}, no_total={no_total}')
     print()
 
-def auto_make_markets(market_ids):
+def auto_make_markets(market_ids, time_exit=False):
     print(f'[START]\tmarkets_to_trade={market_ids}\n')
     
     while True:
@@ -140,6 +143,15 @@ def auto_make_markets(market_ids):
             if control['stop'] == 'true':
                 set_stop(False)
                 exit()
+            
+            # Time based exit
+            current_time_utc = datetime.now(timezone.utc)
+            hour = current_time_utc.hour
+            minute = current_time_utc.minute
+            if time_exit == True and hour == 23 and minute >= 50:
+                print('[TIME]\texiting')
+                log_message('[TIME]\texiting')
+                return
 
             # Trade market
             market_id = market_ids[i]
@@ -224,16 +236,29 @@ def dump_everything():
             if no_amt >= 5:
                 limit_order(market=market, side='sell', outcome='no', price=best_bid_no, size=no_amt)
 
-def run_all():
+def select_markets():
     account_balance = get_account_balance()
+    num_markets = math.floor(account_balance / 65)
 
-    top_ids = get_top_events(3)
+    top_ids = get_top_events(num_markets)
     overwrite_markets_to_trade(top_ids)
 
+def run_autonomously():
+    while True:
+        select_markets()
+
+        control = get_json('control.json')
+        auto_make_markets(control['markets_to_trade'], True)
+
+        start_sell_off()
+        time.sleep(60 * 20)
+        dump_everything()
+        time.sleep(10)
+
 # control = get_json('control.json')
-# markets_to_trade = control['markets_to_trade']
-# auto_make_markets(markets_to_trade)
+# auto_make_markets(control['markets_to_trade'])
 
 # start_sell_off()
 # dump_everything()
-# run_all()
+
+# run_autonomously()
