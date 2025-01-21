@@ -79,6 +79,8 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     sell_price = round(1 - buy_price, 3)
     
     size = bands[str(band_num)]['avg_amount'] - current_total_in_band
+    if size <= 0:
+        return
     if size < 5:
         size = 5
     
@@ -98,7 +100,7 @@ def conditional_order(market, outcome, current_total_in_band, bands, band_num, m
     if available_to_buy >= size * buy_price:
         # Stop if we are overbuying one outcome
         if outcome == owned_outcome and (abs(owned_yes) + size) > max_position:
-            size = max_position - owned_yes
+            size = max_position - abs(owned_yes)
             if size < 5 or size * buy_price < 1:
                 return
         limit_order(market=market, side='buy', outcome=outcome, price=buy_price, size=size)

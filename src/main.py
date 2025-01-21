@@ -149,6 +149,8 @@ def start_sell_off():
     cancel_all_orders()
 
     pos = get_json('positions.json')
+    if pos == []:
+        return
 
     for item in pos.items():
         market_id = item[0]
@@ -195,6 +197,8 @@ def dump_everything():
         cancel_all_orders()
 
         pos = get_json('positions.json')
+        if pos == []:
+            return
 
         for item in pos.items():
             market_id = item[0]
@@ -223,11 +227,13 @@ def dump_everything():
 def run_all():
     account_balance = get_account_balance()
 
-    top_ids = get_top_events(5)
+    top_ids = get_top_events(3)
     overwrite_markets_to_trade(top_ids)
 
 # control = get_json('control.json')
 # markets_to_trade = control['markets_to_trade']
 # auto_make_markets(markets_to_trade)
 
-dump_everything()
+# start_sell_off()
+# dump_everything()
+# run_all()
